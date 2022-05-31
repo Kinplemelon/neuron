@@ -54,6 +54,24 @@ struct neu_rest_handler web_handlers[] = {
     },
 };
 
+struct neu_rest_handler ekuiper_handlers[] = {
+    {
+        .method     = NEU_REST_METHOD_GET,
+        .type       = NEU_REST_HANDLER_DIRECTORY,
+        .url        = "",
+        .value.path = "./dist/ekuiper",
+    },
+};
+
+struct neu_rest_handler ekuiper_cors_handler[] = {
+    {
+        .url = "",
+    },
+    {
+        .url = "/ekuiper",
+    },
+};
+
 static void cors(nng_aio *aio);
 
 struct neu_rest_handler cors_handler[] = {
@@ -293,6 +311,13 @@ void neu_rest_web_handler(const struct neu_rest_handler **handlers,
     *size     = sizeof(web_handlers) / sizeof(struct neu_rest_handler);
 }
 
+void neu_rest_ekuiper_handler(const struct neu_rest_handler **handlers,
+                              uint32_t *                      size)
+{
+    *handlers = ekuiper_handlers;
+    *size     = sizeof(ekuiper_handlers) / sizeof(struct neu_rest_handler);
+}
+
 void neu_rest_api_handler(const struct neu_rest_handler **handlers,
                           uint32_t *                      size)
 {
@@ -310,6 +335,19 @@ void neu_rest_api_cors_handler(const struct neu_rest_handler **handlers,
         cors_handler[i].method        = NEU_REST_METHOD_OPTIONS;
         cors_handler[i].type          = NEU_REST_HANDLER_FUNCTION;
         cors_handler[i].value.handler = cors;
+    }
+}
+
+void neu_rest_ekuiper_cors_handler(const struct neu_rest_handler **handlers,
+                                   uint32_t *                      size)
+{
+    *handlers = ekuiper_cors_handler;
+    *size     = sizeof(ekuiper_cors_handler) / sizeof(struct neu_rest_handler);
+
+    for (uint32_t i = 0; i < *size; i++) {
+        ekuiper_cors_handler[i].method        = NEU_REST_METHOD_OPTIONS;
+        ekuiper_cors_handler[i].type          = NEU_REST_HANDLER_FUNCTION;
+        ekuiper_cors_handler[i].value.handler = cors;
     }
 }
 

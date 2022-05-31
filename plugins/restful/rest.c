@@ -37,6 +37,7 @@ struct neu_plugin {
     neu_plugin_common_t    common;
     nng_http_server *      api_server;
     nng_http_server *      web_server;
+    nng_http_server *      ekuiper_server;
     neu_rest_handle_ctx_t *handle_ctx;
 };
 
@@ -104,6 +105,8 @@ static nng_http_server *server_init(char *type)
 
     if (strncmp(type, "api", strlen("api")) == 0) {
         snprintf(host_port, sizeof(host_port), "http://0.0.0.0:7001");
+    } else if (strncmp(type, "ekuiper", strlen("ekuiper")) == 0) {
+        snprintf(host_port, sizeof(host_port), "http://0.0.0.0:7002");
     } else {
         snprintf(host_port, sizeof(host_port), "http://0.0.0.0:7000");
     }
@@ -151,10 +154,12 @@ static neu_plugin_t *dashb_plugin_open(neu_adapter_t *            adapter,
 
     plugin->handle_ctx = neu_rest_init_ctx(plugin);
 
-    plugin->web_server = server_init("web");
-    plugin->api_server = server_init("api");
+    plugin->web_server     = server_init("web");
+    plugin->api_server     = server_init("api");
+    plugin->ekuiper_server = server_init("ekuiper");
 
-    if (plugin->web_server == NULL || plugin->api_server == NULL) {
+    if (plugin->web_server == NULL || plugin->api_server == NULL ||
+        plugin->ekuiper_server == NULL) {
         nlog_error("Failed to create web server and api server");
         goto server_init_fail;
     }
@@ -182,6 +187,20 @@ static neu_plugin_t *dashb_plugin_open(neu_adapter_t *            adapter,
         goto web_server_start_fail;
     }
 
+    neu_rest_ekuiper_handler(&rest_handlers, &n_handler);
+    for (uint32_t i = 0; i < n_handler; i++) {
+        rest_add_handler(plugin->ekuiper_server, &rest_handlers[i]);
+    }
+    neu_rest_ekuiper_cors_handler(&cors, &n_handler);
+    for (uint32_t i = 0; i < n_handler; i++) {
+        rest_add_handler(plugin->ekuiper_server, &cors[i]);
+    }
+
+    if ((rv = nng_http_server_start(plugin->ekuiper_server)) != 0) {
+        nlog_error("Failed to start web server, error=%d", rv);
+        goto web_server_start_fail;
+    }
+
     handle_rw_init();
     nlog_info("Success to create plugin: %s", neu_plugin_module.module_name);
     return plugin;
@@ -195,6 +214,9 @@ server_init_fail:
     }
     if (plugin->api_server != NULL) {
         nng_http_server_release(plugin->api_server);
+    }
+    if (plugin->ekuiper_server != NULL) {
+        nng_http_server_release(plugin->ekuiper_server);
     }
     neu_rest_free_ctx(plugin->handle_ctx);
     free(plugin);
@@ -210,6 +232,8 @@ static int dashb_plugin_close(neu_plugin_t *plugin)
     nng_http_server_release(plugin->api_server);
     nng_http_server_stop(plugin->web_server);
     nng_http_server_release(plugin->web_server);
+    nng_http_server_stop(plugin->ekuiper_server);
+    nng_http_server_release(plugin->ekuiper_server);
 
     neu_rest_free_ctx(plugin->handle_ctx);
 
